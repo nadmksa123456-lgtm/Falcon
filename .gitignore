@@ -1,0 +1,13 @@
+# نظام التشغيل والمحررات
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ملفات Roblox المحلية والمؤقتة
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+*.log
+*.tmp
