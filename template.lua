@@ -19,6 +19,7 @@ local Library = compiler(loaderSource, "@TRust-Menu/loader.lua")()
 
 local Window = Library:CreateWindow({
 	Name = "TRust Menu",
+	NotifyTitle = "Talon Script",
 	Size = Vector2.new(1000, 620),
 	ThemeColor = Color3.fromRGB(255, 5, 126),
 	ToggleKey = Enum.KeyCode.Insert,
