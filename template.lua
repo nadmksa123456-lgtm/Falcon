@@ -113,6 +113,8 @@ Controls.MenuButton = Sections.MenuSettings:AddToggle({
 	Flag = "menu_button",
 	Order = 4,
 	Default = true,
+	-- The menu's own controls stay silent; notifications are for gameplay features.
+	Notify = false,
 	Callback = function(state)
 		Window:SetLauncherVisible(state)
 	end,
