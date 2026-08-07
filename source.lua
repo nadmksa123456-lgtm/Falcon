@@ -583,6 +583,22 @@ function Library:GetFlag(flag)
     return self.Flags[flag]
 end
 
+function Library:Notify(notifyOptions)
+    local window = self.Windows[#self.Windows]
+    if not window or not window.Notify then
+        warn("[TRust Menu] Notify was called before a window existed.")
+        return
+    end
+    return window:Notify(notifyOptions)
+end
+
+function Library:ClearNotifications()
+    local window = self.Windows[#self.Windows]
+    if window and window.ClearNotifications then
+        window:ClearNotifications()
+    end
+end
+
 function Library:Unload()
     for _, window in self.Windows do
         if window.ScreenGui and window.ScreenGui.Parent then
@@ -1108,6 +1124,28 @@ function Library:CreateWindow(options)
     })
     bindTheme(launcherGlyph, "TextColor3", function(theme) return theme.Accent end)
 
+    local NOTIFY_WIDTH = options.NotificationWidth or 306
+    local NOTIFY_HEIGHT = options.NotificationHeight or 74
+    local NOTIFY_LIMIT = options.NotificationLimit or 5
+
+    local notifyHolder = create("Frame", {
+        Parent = screenGui,
+        Name = "Notifications",
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -18, 0, 18),
+        Size = UDim2.new(0, NOTIFY_WIDTH, 1, -36),
+        BackgroundTransparency = 1,
+        ClipsDescendants = false,
+        ZIndex = 300,
+    })
+    create("UIListLayout", {
+        Parent = notifyHolder,
+        Padding = UDim.new(0, 10),
+        HorizontalAlignment = Enum.HorizontalAlignment.Right,
+        VerticalAlignment = Enum.VerticalAlignment.Top,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+    })
+
     local window = {
         Library = Library,
         Name = options.Name or "TRust Menu",
@@ -1135,6 +1173,8 @@ function Library:CreateWindow(options)
         Visible = true,
         Opacity = 1,
         WindowScale = windowScale,
+        NotifyHolder = notifyHolder,
+        NotifyToggles = options.NotifyToggles ~= false,
         Launcher = launcher,
         LauncherButton = launcherButton,
         LauncherGlow = launcherGlow,
@@ -1370,6 +1410,205 @@ function Library:CreateWindow(options)
             setProperties(launcherStroke, {Transparency = strokeTransparency})
             setProperties(launcherIcon, {Size = fromOffset(iconSize, iconSize)})
         end
+    end
+
+    local NOTIFY_SLIDE_IN = 0.30
+    local NOTIFY_SLIDE_OUT = 0.22
+    local NOTIFY_COLLAPSE = 0.16
+    local notifyOrder = 0
+    local activeNotifications = {}
+
+    local function dismissNotification(entry)
+        if entry.Dismissed then return end
+        entry.Dismissed = true
+
+        local index = table.find(activeNotifications, entry)
+        if index then table.remove(activeNotifications, index) end
+        if not entry.Wrapper.Parent then return end
+
+        tween(entry.Card, {Position = fromOffset(46, 0)}, NOTIFY_SLIDE_OUT, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+        tween(entry.Group, {GroupTransparency = 1}, NOTIFY_SLIDE_OUT, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+
+        task.delay(NOTIFY_SLIDE_OUT, function()
+            if not entry.Wrapper.Parent then return end
+
+            -- Collapsing the row height lets the stack close the gap smoothly
+            -- instead of the cards below snapping upwards.
+            tween(entry.Wrapper, {Size = UDim2.new(1, 0, 0, 0)}, NOTIFY_COLLAPSE, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+            task.delay(NOTIFY_COLLAPSE, function()
+                if entry.Wrapper.Parent then entry.Wrapper:Destroy() end
+            end)
+        end)
+    end
+
+    function window:ClearNotifications()
+        for index = #activeNotifications, 1, -1 do
+            dismissNotification(activeNotifications[index])
+        end
+    end
+
+    function window:Notify(notifyOptions)
+        if type(notifyOptions) == "string" then
+            notifyOptions = {Text = notifyOptions}
+        end
+        notifyOptions = notifyOptions or {}
+
+        local title = tostring(notifyOptions.Title or self.Name)
+        local message = tostring(notifyOptions.Text or notifyOptions.Content or "")
+        local duration = tonumber(notifyOptions.Duration) or 3
+        local state = notifyOptions.State
+
+        -- Oldest cards give way first so the stack never grows past the limit.
+        while #activeNotifications >= NOTIFY_LIMIT do
+            dismissNotification(activeNotifications[1])
+        end
+
+        local iconAsset = logoImage
+        if notifyOptions.Icon ~= nil or notifyOptions.IconFile ~= nil then
+            iconAsset = resolveImage(notifyOptions.Icon, notifyOptions.IconFile)
+        end
+
+        notifyOrder += 1
+        local wrapper = create("Frame", {
+            Parent = notifyHolder,
+            Name = "Notification",
+            Size = UDim2.new(1, 0, 0, NOTIFY_HEIGHT),
+            BackgroundTransparency = 1,
+            ClipsDescendants = true,
+            LayoutOrder = notifyOrder,
+        })
+
+        -- A CanvasGroup so the whole card fades as one piece rather than each
+        -- label fading on its own schedule.
+        local group = create("CanvasGroup", {
+            Parent = wrapper,
+            Name = "Group",
+            Size = UDim2.new(1, 0, 0, NOTIFY_HEIGHT),
+            BackgroundTransparency = 1,
+            GroupTransparency = 1,
+        })
+
+        local card = create("Frame", {
+            Parent = group,
+            Name = "Card",
+            Position = fromOffset(46, 0),
+            Size = UDim2.new(1, 0, 0, NOTIFY_HEIGHT),
+            BackgroundColor3 = Theme.Card,
+            BackgroundTransparency = 0.1,
+            ClipsDescendants = true,
+        })
+        corner(card, 14)
+        local cardStroke = stroke(card, Theme.Accent, 0.72, 1)
+        bindTheme(card, "BackgroundColor3", function(theme) return theme.Card end)
+        bindTheme(cardStroke, "Color", function(theme) return theme.Accent end)
+
+        local icon = create("ImageLabel", {
+            Parent = card,
+            Name = "Icon",
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = UDim2.new(0, 16, 0.5, 0),
+            Size = fromOffset(38, 38),
+            BackgroundTransparency = 1,
+            Image = iconAsset,
+            ImageColor3 = Theme.Accent,
+            ScaleType = Enum.ScaleType.Fit,
+            Visible = iconAsset ~= "",
+        })
+        bindTheme(icon, "ImageColor3", function(theme) return theme.Accent end)
+
+        local iconGlyph = create("TextLabel", {
+            Parent = card,
+            Name = "IconGlyph",
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = UDim2.new(0, 16, 0.5, 0),
+            Size = fromOffset(38, 38),
+            BackgroundTransparency = 1,
+            Text = options.LogoFallback or "T",
+            TextColor3 = Theme.Accent,
+            TextSize = interfaceTextSize(20),
+            FontFace = Fonts.Bold,
+            Visible = iconAsset == "",
+        })
+        bindTheme(iconGlyph, "TextColor3", function(theme) return theme.Accent end)
+
+        create("TextLabel", {
+            Parent = card,
+            Name = "Title",
+            Position = fromOffset(66, 13),
+            Size = UDim2.new(1, -82, 0, 22),
+            BackgroundTransparency = 1,
+            Text = string.upper(title),
+            TextColor3 = Theme.Text,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+            TextSize = interfaceTextSize(15),
+            FontFace = Fonts.Bold,
+        })
+
+        local messageLabel = create("TextLabel", {
+            Parent = card,
+            Name = "Message",
+            Position = fromOffset(66, 37),
+            Size = UDim2.new(1, -82, 0, 22),
+            BackgroundTransparency = 1,
+            Text = message,
+            TextColor3 = state == true and Theme.Accent or Theme.Muted,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+            TextSize = interfaceTextSize(15),
+            FontFace = Fonts.Regular,
+        })
+        if state == true then
+            bindTheme(messageLabel, "TextColor3", function(theme) return theme.Accent end)
+        end
+
+        local timerBar = create("Frame", {
+            Parent = card,
+            Name = "Timer",
+            AnchorPoint = Vector2.new(0, 1),
+            Position = UDim2.new(0, 0, 1, 0),
+            Size = UDim2.new(1, 0, 0, 2),
+            BackgroundColor3 = Theme.Accent,
+            BackgroundTransparency = 0.25,
+        })
+        bindTheme(timerBar, "BackgroundColor3", function(theme) return theme.Accent end)
+
+        local entry = {
+            Wrapper = wrapper,
+            Group = group,
+            Card = card,
+            Dismissed = false,
+        }
+        insert(activeNotifications, entry)
+
+        tween(card, {Position = fromOffset(0, 0)}, NOTIFY_SLIDE_IN, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+        tween(group, {GroupTransparency = 0}, NOTIFY_SLIDE_IN, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+        tween(timerBar, {Size = UDim2.new(0, 0, 0, 2)}, duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+
+        -- Clicking a card dismisses it early.
+        local dismissButton = create("TextButton", {
+            Parent = card,
+            Name = "Dismiss",
+            Size = UDim2.fromScale(1, 1),
+            BackgroundTransparency = 1,
+            AutoButtonColor = false,
+            Text = "",
+            ZIndex = 5,
+        })
+        dismissButton.Activated:Connect(function()
+            dismissNotification(entry)
+        end)
+
+        task.delay(duration, function()
+            dismissNotification(entry)
+        end)
+
+        return entry
+    end
+
+    function window:SetToggleNotifications(state)
+        self.NotifyToggles = state ~= false
+        return self.NotifyToggles
     end
 
     function window:SetVisible(state, animate)
@@ -2606,6 +2845,9 @@ function SectionMethods:AddToggle(options)
     local callback = options.Callback or options.OnChanged or options.Function
     local flag = self:NextFlag(options.Flag)
     local defaultState = options.Default == true
+    local notifyOption = options.Notify
+    local notifyTitle = options.NotifyTitle
+    local notifyDuration = options.NotifyDuration
 
     local row = create("TextButton", {
         Parent = self.Content,
@@ -2812,7 +3054,24 @@ function SectionMethods:AddToggle(options)
         self:ApplyVisual(self.Initialized)
         self.Initialized = true
 
-        if emit and changed and callback then safeCallback(callback, self.Value) end
+        if emit and changed then
+            -- A nil Notify on the control defers to the window-wide setting,
+            -- so a script can silence one toggle without touching the rest.
+            local ownerWindow = self.Section.Window
+            local shouldNotify = notifyOption
+            if shouldNotify == nil then shouldNotify = ownerWindow.NotifyToggles end
+
+            if shouldNotify and ownerWindow.Notify then
+                ownerWindow:Notify({
+                    Title = notifyTitle,
+                    Text = text .. ": " .. (self.Value and "ON" or "OFF"),
+                    State = self.Value,
+                    Duration = notifyDuration,
+                })
+            end
+
+            if callback then safeCallback(callback, self.Value) end
+        end
         return self.Value
     end
 
