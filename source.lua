@@ -1175,6 +1175,7 @@ function Library:CreateWindow(options)
         WindowScale = windowScale,
         NotifyHolder = notifyHolder,
         NotifyToggles = options.NotifyToggles ~= false,
+        NotifyTitle = options.NotifyTitle or options.NotificationTitle,
         Launcher = launcher,
         LauncherButton = launcherButton,
         LauncherGlow = launcherGlow,
@@ -1453,7 +1454,7 @@ function Library:CreateWindow(options)
         end
         notifyOptions = notifyOptions or {}
 
-        local title = tostring(notifyOptions.Title or self.Name)
+        local title = tostring(notifyOptions.Title or self.NotifyTitle or self.Name)
         local message = tostring(notifyOptions.Text or notifyOptions.Content or "")
         local duration = tonumber(notifyOptions.Duration) or 3
         local state = notifyOptions.State
@@ -1537,7 +1538,7 @@ function Library:CreateWindow(options)
             Position = fromOffset(66, 13),
             Size = UDim2.new(1, -82, 0, 22),
             BackgroundTransparency = 1,
-            Text = string.upper(title),
+            Text = title,
             TextColor3 = Theme.Text,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextTruncate = Enum.TextTruncate.AtEnd,
@@ -1604,6 +1605,11 @@ function Library:CreateWindow(options)
         end)
 
         return entry
+    end
+
+    function window:SetNotifyTitle(value)
+        self.NotifyTitle = value ~= nil and tostring(value) or nil
+        return self.NotifyTitle or self.Name
     end
 
     function window:SetToggleNotifications(state)
