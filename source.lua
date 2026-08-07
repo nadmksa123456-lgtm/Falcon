@@ -651,10 +651,14 @@ local function makeDraggable(frame, handles, closePopups)
         local activeCamera = Workspace.CurrentCamera or Camera
         local viewport = activeCamera and activeCamera.ViewportSize or Vector2.new(1280, 720)
 
+        -- The frame is centre-anchored, so these bounds are expressed as the
+        -- centre point that still leaves 80px of the window on screen.
+        local halfWidth = width / 2
+        local halfHeight = height / 2
         local x = startPosition.X.Offset + delta.X
         local y = startPosition.Y.Offset + delta.Y
-        x = clamp(x, -(width - 80), viewport.X - 80)
-        y = clamp(y, 0, viewport.Y - 48)
+        x = clamp(x, 80 - halfWidth, viewport.X - 80 + halfWidth)
+        y = clamp(y, halfHeight, viewport.Y - 48 + halfHeight)
         frame.Position = fromOffset(x, y)
     end)
 
@@ -709,13 +713,17 @@ function Library:CreateWindow(options)
         DisplayOrder = options.DisplayOrder or 999,
     })
 
-    local initialX = floor((viewport.X - width) / 2)
-    local initialY = floor((viewport.Y - height) / 2)
+    -- MainWindow and its depth layers are centre-anchored. UIScale pivots on
+    -- the anchor point, so a centred anchor lets the open/close scale run
+    -- without touching Position at all.
+    local initialX = floor(viewport.X / 2)
+    local initialY = floor(viewport.Y / 2)
 
     local windowShadowFar = create("Frame", {
         Parent = screenGui,
         Name = "WindowShadowFar",
-        Position = fromOffset(initialX + 8, initialY + 13),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = fromOffset(initialX + 10, initialY + 16),
         Size = fromOffset(width + 4, height + 5),
         BackgroundColor3 = Theme.Shadow,
         BackgroundTransparency = 1,
@@ -726,7 +734,8 @@ function Library:CreateWindow(options)
     local windowGlow = create("Frame", {
         Parent = screenGui,
         Name = "WindowAccentGlow",
-        Position = fromOffset(initialX - 5, initialY - 5),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = fromOffset(initialX, initialY),
         Size = fromOffset(width + 10, height + 10),
         BackgroundColor3 = Theme.Accent,
         BackgroundTransparency = 1,
@@ -740,7 +749,8 @@ function Library:CreateWindow(options)
     local windowShadowNear = create("Frame", {
         Parent = screenGui,
         Name = "WindowShadowNear",
-        Position = fromOffset(initialX + 4, initialY + 7),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = fromOffset(initialX + 4, initialY + 8),
         Size = fromOffset(width, height + 2),
         BackgroundColor3 = Theme.Shadow,
         BackgroundTransparency = 1,
@@ -751,6 +761,7 @@ function Library:CreateWindow(options)
     local main = create("CanvasGroup", {
         Parent = screenGui,
         Name = "MainWindow",
+        AnchorPoint = Vector2.new(0.5, 0.5),
         Position = fromOffset(initialX, initialY),
         Size = fromOffset(width, height),
         BackgroundColor3 = Theme.Window,
@@ -761,39 +772,15 @@ function Library:CreateWindow(options)
     stroke(main, Theme.Border, 0.05, 1)
     gradient(main, Theme.Window, Theme.Content, 90)
 
-    -- MainWindow clips; Body holds the real layout at full height and is
-    -- anchored to the vertical centre. Shrinking MainWindow's height therefore
-    -- trims Body from the top and the bottom at once, which is what makes the
-    -- CRT collapse read as a squeeze instead of a roller blind.
-    local body = create("Frame", {
-        Parent = main,
-        Name = "Body",
-        AnchorPoint = Vector2.new(0, 0.5),
-        Position = UDim2.new(0, 0, 0.5, 0),
-        Size = fromOffset(width, height),
-        BackgroundTransparency = 1,
-        ClipsDescendants = false,
-    })
-
-    -- The bright scanline the collapse converges onto.
-    local crtLine = create("Frame", {
-        Parent = main,
-        Name = "CRTLine",
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.new(1, -24, 0, 2),
-        BackgroundColor3 = Theme.AccentLight,
-        BackgroundTransparency = 1,
-        ZIndex = 90,
-    })
-    corner(crtLine, 2)
-    bindTheme(crtLine, "BackgroundColor3", function(theme) return theme.AccentLight end)
+    -- Drives the open/close scale. Kept separate from Size so FitToViewport
+    -- and the drag handler keep owning the real geometry.
+    local windowScale = create("UIScale", {Parent = main, Scale = 1})
 
     -- Accent depth is rendered inside the window bounds. The old outer shadow
     -- layers remain hidden for field compatibility, preventing bright themes
     -- and high opacity from leaking glow beyond the menu frame.
     local windowInnerGlow = create("Frame", {
-        Parent = body,
+        Parent = main,
         Name = "WindowInnerGlow",
         Position = fromOffset(2, 2),
         Size = UDim2.new(1, -4, 1, -4),
@@ -806,7 +793,7 @@ function Library:CreateWindow(options)
     bindTheme(windowInnerGlowStroke, "Color", function(theme) return theme.Accent end)
 
     local sidebar = create("Frame", {
-        Parent = body,
+        Parent = main,
         Name = "Sidebar",
         Size = UDim2.new(0, sidebarWidth, 1, 0),
         BackgroundColor3 = Theme.Sidebar,
@@ -929,7 +916,7 @@ function Library:CreateWindow(options)
     })
 
     local topbar = create("Frame", {
-        Parent = body,
+        Parent = main,
         Name = "Topbar",
         Position = fromOffset(sidebarWidth, 0),
         Size = UDim2.new(1, -sidebarWidth, 0, topbarHeight),
@@ -1027,7 +1014,7 @@ function Library:CreateWindow(options)
     })
 
     local content = create("Frame", {
-        Parent = body,
+        Parent = main,
         Name = "Content",
         Position = fromOffset(sidebarWidth, topbarHeight),
         Size = UDim2.new(1, -sidebarWidth, 1, -topbarHeight),
@@ -1147,10 +1134,7 @@ function Library:CreateWindow(options)
         CapturingKeybind = nil,
         Visible = true,
         Opacity = 1,
-        Body = body,
-        CRTLine = crtLine,
-        RestingPosition = fromOffset(initialX, initialY),
-        RestingSize = fromOffset(width, height),
+        WindowScale = windowScale,
         Launcher = launcher,
         LauncherButton = launcherButton,
         LauncherGlow = launcherGlow,
@@ -1170,21 +1154,19 @@ function Library:CreateWindow(options)
     local function syncWindowDepth()
         if not main.Parent then return end
 
-        -- These three layers are kept hidden for field compatibility. Without
-        -- this early-out they would take six property writes every frame of the
-        -- CRT squeeze for something nobody can see.
+        -- These three layers ship hidden. Without this early-out they would eat
+        -- six property writes on every frame of the open/close tween for
+        -- something that is never rendered.
         if not (windowGlow.Visible or windowShadowNear.Visible or windowShadowFar.Visible) then
             return
         end
 
+        -- Everything here is centre-anchored, so each layer only needs its
+        -- offset from the window centre plus its own size.
         local position = main.Position
         local size = main.Size
-        windowGlow.Position = UDim2.new(
-            position.X.Scale,
-            position.X.Offset - 5,
-            position.Y.Scale,
-            position.Y.Offset - 5
-        )
+
+        windowGlow.Position = position
         windowGlow.Size = UDim2.new(
             size.X.Scale,
             size.X.Offset + 10,
@@ -1195,7 +1177,7 @@ function Library:CreateWindow(options)
             position.X.Scale,
             position.X.Offset + 4,
             position.Y.Scale,
-            position.Y.Offset + 7
+            position.Y.Offset + 8
         )
         windowShadowNear.Size = UDim2.new(
             size.X.Scale,
@@ -1205,9 +1187,9 @@ function Library:CreateWindow(options)
         )
         windowShadowFar.Position = UDim2.new(
             position.X.Scale,
-            position.X.Offset + 8,
+            position.X.Offset + 10,
             position.Y.Scale,
-            position.Y.Offset + 13
+            position.Y.Offset + 16
         )
         windowShadowFar.Size = UDim2.new(
             size.X.Scale,
@@ -1305,28 +1287,15 @@ function Library:CreateWindow(options)
     window:RegisterGlow(windowInnerGlowStroke, "Transparency", 0.78)
     window:SetOpacity(options.MenuOpacity or options.Opacity or 100, false)
 
-    -- CRT power cycle. Closing squeezes the window down to a scanline, then
-    -- lets that line fade. Opening runs the same two beats in reverse.
-    local CRT_LINE_HEIGHT = 2
-    local CRT_SQUEEZE = 0.17 -- vertical collapse / expansion
-    local CRT_FADE = 0.13    -- the scanline appearing or dying
+    -- Scale carries the whole motion. Position never moves, so nothing has to
+    -- stay in sync with anything else and text never lands on a half pixel.
+    local VISIBILITY_SHRINK = 0.90
+    local VISIBILITY_IN = 0.26
+    local VISIBILITY_OUT = 0.18
     local visibilityToken = 0
 
     local function openTransparency()
         return (1 - window.Opacity) * 0.7
-    end
-
-    local function collapsedSize(size)
-        return UDim2.new(size.X.Scale, size.X.Offset, 0, CRT_LINE_HEIGHT)
-    end
-
-    local function collapsedPosition(position, size)
-        return UDim2.new(
-            position.X.Scale,
-            position.X.Offset,
-            position.Y.Scale,
-            position.Y.Offset + floor((size.Y.Offset - CRT_LINE_HEIGHT) / 2)
-        )
     end
 
     function window:FitToViewport()
@@ -1341,20 +1310,13 @@ function Library:CreateWindow(options)
         local nextWidth = max(minX, min(requestedSize.X, availableX))
         local nextHeight = max(minY, min(requestedSize.Y, availableY))
 
-        local base = (self.Visible == false and self.RestingPosition) or self.Main.Position
-        local nextX = clamp(base.X.Offset, 0, max(0, liveViewport.X - nextWidth))
-        local nextY = clamp(base.Y.Offset, 0, max(0, liveViewport.Y - nextHeight))
-        self.RestingSize = fromOffset(nextWidth, nextHeight)
-        self.RestingPosition = fromOffset(nextX, nextY)
-        self.Body.Size = self.RestingSize
+        self.Main.Size = fromOffset(nextWidth, nextHeight)
 
-        if self.Visible == false then
-            self.Main.Size = collapsedSize(self.RestingSize)
-            self.Main.Position = collapsedPosition(self.RestingPosition, self.RestingSize)
-        else
-            self.Main.Size = self.RestingSize
-            self.Main.Position = self.RestingPosition
-        end
+        local halfWidth = floor(nextWidth / 2)
+        local halfHeight = floor(nextHeight / 2)
+        local nextX = clamp(self.Main.Position.X.Offset, halfWidth, max(halfWidth, liveViewport.X - halfWidth))
+        local nextY = clamp(self.Main.Position.Y.Offset, halfHeight, max(halfHeight, liveViewport.Y - halfHeight))
+        self.Main.Position = fromOffset(nextX, nextY)
 
         local launcherFrame = self.Launcher
         if launcherFrame and launcherFrame.Parent then
@@ -1415,76 +1377,50 @@ function Library:CreateWindow(options)
         if animate == nil then animate = true end
         if self.Visible == state then return self.Visible end
 
-        if not state then
-            self:ClosePopup()
-            self.RestingPosition = self.Main.Position
-            self.RestingSize = self.Main.Size
-        end
+        if not state then self:ClosePopup() end
 
         self.Visible = state
         visibilityToken += 1
         local token = visibilityToken
-
-        local restSize = self.RestingSize
-        local restPosition = self.RestingPosition
-        local lineSize = collapsedSize(restSize)
-        local linePosition = collapsedPosition(restPosition, restSize)
         self:RefreshLauncher(animate)
 
+        local targetScale = state and 1 or VISIBILITY_SHRINK
+        local targetTransparency = state and openTransparency() or 1
+
         if not animate then
-            setProperties(self.Main, {
-                Size = state and restSize or lineSize,
-                Position = state and restPosition or linePosition,
-                GroupTransparency = state and openTransparency() or 1,
-            })
-            setProperties(self.CRTLine, {BackgroundTransparency = 1})
-            setProperties(self.PopupLayer, {GroupTransparency = state and openTransparency() or 1})
+            setProperties(self.WindowScale, {Scale = targetScale})
+            setProperties(self.Main, {GroupTransparency = targetTransparency})
+            setProperties(self.PopupLayer, {GroupTransparency = targetTransparency})
             self.Main.Visible = state
             self.PopupLayer.Visible = state
             return self.Visible
         end
 
         if state then
-            -- Beat 1: the scanline strikes. Beat 2: it opens out to the window.
-            setProperties(self.Main, {
-                Size = lineSize,
-                Position = linePosition,
-                GroupTransparency = 1,
-            })
-            setProperties(self.CRTLine, {BackgroundTransparency = 1})
+            -- Start from the closed pose every time. If a close tween is still
+            -- running its own properties get cancelled by the tween helper, so
+            -- the opening motion always covers the same distance.
+            setProperties(self.WindowScale, {Scale = VISIBILITY_SHRINK})
+            setProperties(self.Main, {GroupTransparency = 1})
             setProperties(self.PopupLayer, {GroupTransparency = 1})
             self.Main.Visible = true
             self.PopupLayer.Visible = true
 
-            tween(self.Main, {GroupTransparency = openTransparency()}, CRT_FADE, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-            tween(self.CRTLine, {BackgroundTransparency = 0.1}, CRT_FADE, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-            task.delay(CRT_FADE, function()
-                if visibilityToken ~= token or not window.Visible then return end
-                if not main.Parent then return end
-
-                tween(main, {Size = restSize, Position = restPosition}, CRT_SQUEEZE, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-                tween(crtLine, {BackgroundTransparency = 1}, CRT_SQUEEZE, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-                tween(popupLayer, {GroupTransparency = openTransparency()}, CRT_SQUEEZE, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-            end)
+            tween(self.WindowScale, {Scale = 1}, VISIBILITY_IN, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+            tween(self.Main, {GroupTransparency = targetTransparency}, VISIBILITY_IN, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+            tween(self.PopupLayer, {GroupTransparency = targetTransparency}, VISIBILITY_IN, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
         else
-            -- Beat 1: squeeze to the scanline. Beat 2: the line dies out.
-            tween(self.Main, {Size = lineSize, Position = linePosition}, CRT_SQUEEZE, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
-            tween(self.CRTLine, {BackgroundTransparency = 0.1}, CRT_SQUEEZE, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-            tween(self.PopupLayer, {GroupTransparency = 1}, CRT_SQUEEZE, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+            -- Exits accelerate away, entrances settle in. Same easing family in
+            -- both directions, opposite direction, so the pair feels related.
+            tween(self.WindowScale, {Scale = VISIBILITY_SHRINK}, VISIBILITY_OUT, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+            tween(self.Main, {GroupTransparency = 1}, VISIBILITY_OUT, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+            tween(self.PopupLayer, {GroupTransparency = 1}, VISIBILITY_OUT, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
 
-            task.delay(CRT_SQUEEZE, function()
+            -- The token guards against a reopen landing during the fade out.
+            task.delay(VISIBILITY_OUT, function()
                 if visibilityToken ~= token or window.Visible then return end
-                if not main.Parent then return end
-
-                tween(main, {GroupTransparency = 1}, CRT_FADE, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-                tween(crtLine, {BackgroundTransparency = 1}, CRT_FADE, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-
-                task.delay(CRT_FADE, function()
-                    if visibilityToken ~= token or window.Visible then return end
-                    if main.Parent then main.Visible = false end
-                    if popupLayer.Parent then popupLayer.Visible = false end
-                end)
+                if main.Parent then main.Visible = false end
+                if popupLayer.Parent then popupLayer.Visible = false end
             end)
         end
 
