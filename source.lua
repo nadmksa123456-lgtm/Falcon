@@ -51,42 +51,29 @@ end
 
 local customAsset = getcustomasset or getsynasset
 
--- Surface roles are defined once here and consumed by both the Theme table
--- below and deriveSurfaceTheme. Keeping a single copy means a palette edit can
--- no longer be silently reverted the next time Menu Color changes.
-local Surfaces = {
-    Window = rgb(25, 25, 25),
-    Sidebar = rgb(19, 21, 23),
-    Topbar = rgb(26, 28, 31),
-    Content = rgb(25, 25, 25),
-    Card = rgb(30, 33, 37),
-    CardBottom = rgb(27, 30, 34),
-    Shadow = rgb(12, 13, 15),
-    TabActive = rgb(38, 43, 50),
-    Control = rgb(48, 55, 64),
-    ControlBottom = rgb(40, 46, 54),
-    ControlHover = rgb(58, 66, 77),
-    Track = rgb(48, 55, 64),
-    Border = rgb(58, 66, 77),
-    Muted = rgb(138, 139, 141),
-    Dim = rgb(120, 122, 125),
-}
-
-local DEFAULT_ACCENT = rgb(31, 106, 181)
-local DEFAULT_DIVIDER = rgb(58, 66, 77)
-
 local Theme = {
-    Accent = DEFAULT_ACCENT,          -- #1F6AB5 Primary Blue
-    AccentSoft = rgb(41, 121, 199),   -- #2979C7 Pressed
-    AccentLight = rgb(66, 142, 216),  -- #428ED8 Hover / Active
-    Divider = DEFAULT_DIVIDER,
-    Text = rgb(245, 245, 245),
+    Accent = rgb(255, 5, 126),       -- #FF057E Primary Pink
+    AccentSoft = rgb(255, 20, 147),  -- #FF1493 Accent Pink
+    AccentLight = rgb(255, 77, 157), -- #FF4D9D Hover / Active
+    Window = rgb(15, 13, 18),        -- #0F0D12 Background
+    Sidebar = rgb(15, 13, 18),
+    Topbar = rgb(15, 13, 18),
+    Content = rgb(22, 19, 26),       -- #16131A Surface
+    Card = rgb(30, 26, 35),          -- #1E1A23 Card
+    CardBottom = rgb(22, 19, 26),
+    Shadow = rgb(15, 13, 18),
+    TabActive = rgb(30, 26, 35),
+    Control = rgb(44, 37, 51),       -- #2C2533 Border / control depth
+    ControlBottom = rgb(30, 26, 35),
+    ControlHover = rgb(44, 37, 51),
+    Track = rgb(44, 37, 51),
+    Border = rgb(44, 37, 51),
+    Divider = rgb(77, 27, 52),       -- #4D1B34 Sidebar / topbar separators
+    Text = rgb(255, 255, 255),
+    Muted = rgb(179, 179, 184),      -- #B3B3B8 Text Secondary
+    Dim = rgb(179, 179, 184),
     White = rgb(255, 255, 255),
 }
-
-for role, color in pairs(Surfaces) do
-    Theme[role] = color
-end
 
 -- These surface roles stay fixed when Menu Color changes. Only accent-bound
 -- details such as lines, active icons, toggles, sliders, and glow are recolored.
@@ -110,7 +97,7 @@ local SurfaceThemeRoles = {
 
 local ROBOTO_FAMILY = "rbxasset://fonts/families/Roboto.json"
 local GOTHAM_FALLBACK = "rbxasset://fonts/families/GothamSSm.json"
-local TYPOGRAPHY_SCALE = clamp(tonumber(environment.TRUST_MENU_FONT_SCALE) or 1, 0.8, 1.5)
+local TYPOGRAPHY_SCALE = clamp(tonumber(environment.TRUST_MENU_FONT_SCALE) or 1.2, 1, 1.5)
 
 local function robotoFont(weight)
     local ok, font = pcall(function()
@@ -428,12 +415,21 @@ local function applySurfaceTheme(library, previousTheme)
 end
 
 local function deriveSurfaceTheme()
-    for role, color in pairs(Surfaces) do
-        Theme[role] = color
-    end
-
-    if colorsClose(Theme.Accent, DEFAULT_ACCENT) then
-        Theme.Divider = DEFAULT_DIVIDER
+    Theme.Window = rgb(15, 13, 18)
+    Theme.Sidebar = rgb(15, 13, 18)
+    Theme.Topbar = rgb(15, 13, 18)
+    Theme.Content = rgb(22, 19, 26)
+    Theme.Card = rgb(30, 26, 35)
+    Theme.CardBottom = rgb(22, 19, 26)
+    Theme.Shadow = rgb(15, 13, 18)
+    Theme.TabActive = rgb(30, 26, 35)
+    Theme.Control = rgb(44, 37, 51)
+    Theme.ControlBottom = rgb(30, 26, 35)
+    Theme.ControlHover = rgb(44, 37, 51)
+    Theme.Track = rgb(44, 37, 51)
+    Theme.Border = rgb(44, 37, 51)
+    if colorsClose(Theme.Accent, rgb(255, 5, 126)) then
+        Theme.Divider = rgb(77, 27, 52)
     else
         local hue, saturation, value = Theme.Accent:ToHSV()
         Theme.Divider = Color3.fromHSV(
@@ -442,6 +438,8 @@ local function deriveSurfaceTheme()
             clamp(value * 0.353, 0.12, 0.42)
         )
     end
+    Theme.Muted = rgb(179, 179, 184)
+    Theme.Dim = rgb(179, 179, 184)
 end
 
 function Library:SetThemeColor(value, animate)
@@ -702,7 +700,7 @@ function Library:CreateWindow(options)
     local initialThemeColor = options.ThemeColor or options.Accent
     if initialThemeColor then self:SetThemeColor(initialThemeColor, false) end
 
-    local requestedSize = options.Size or Vector2.new(660, 512)
+    local requestedSize = options.Size or Vector2.new(1000, 620)
     local activeCamera = Workspace.CurrentCamera or Camera
     if not activeCamera then
         Workspace:GetPropertyChangedSignal("CurrentCamera"):Wait()
@@ -715,8 +713,8 @@ function Library:CreateWindow(options)
     local minimumHeight = min(options.MinimumHeight or 420, availableHeight)
     local width = max(minimumWidth, min(requestedSize.X, availableWidth))
     local height = max(minimumHeight, min(requestedSize.Y, availableHeight))
-    local sidebarWidth = options.SidebarWidth or 64
-    local topbarHeight = options.TopbarHeight or 48
+    local sidebarWidth = options.SidebarWidth or 78
+    local topbarHeight = options.TopbarHeight or 64
 
     local guiParent = getGuiParent()
     local existing = guiParent:FindFirstChild("TRustMenuUI") or guiParent:FindFirstChild("TRustMidnightUI")
@@ -869,7 +867,7 @@ function Library:CreateWindow(options)
         BackgroundTransparency = 1,
         Text = options.LogoFallback or "",
         TextColor3 = Theme.Accent,
-        TextSize = interfaceTextSize(15),
+        TextSize = interfaceTextSize(20),
         FontFace = Fonts.Bold,
         Visible = logoImage == "" and type(options.LogoFallback) == "string" and options.LogoFallback ~= "",
     })
@@ -898,7 +896,7 @@ function Library:CreateWindow(options)
         BackgroundTransparency = 1,
         Text = options.BrandAccentText or "TRust",
         TextColor3 = Theme.Accent,
-        TextSize = interfaceTextSize(10),
+        TextSize = interfaceTextSize(11),
         FontFace = Fonts.Bold,
         LayoutOrder = 1,
     })
@@ -911,7 +909,7 @@ function Library:CreateWindow(options)
         BackgroundTransparency = 1,
         Text = options.BrandText or " Menu",
         TextColor3 = Theme.White,
-        TextSize = interfaceTextSize(10),
+        TextSize = interfaceTextSize(11),
         FontFace = Fonts.Bold,
         LayoutOrder = 2,
     })
@@ -981,7 +979,7 @@ function Library:CreateWindow(options)
         AutoButtonColor = false,
         Text = "",
         TextColor3 = Theme.Muted,
-        TextSize = interfaceTextSize(20),
+        TextSize = interfaceTextSize(26),
         FontFace = Fonts.Regular,
     })
     corner(searchButton, 8)
@@ -1017,7 +1015,7 @@ function Library:CreateWindow(options)
         PlaceholderColor3 = Theme.Dim,
         TextColor3 = Theme.Text,
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Regular,
         ClearTextOnFocus = false,
         Visible = false,
@@ -1119,7 +1117,7 @@ function Library:CreateWindow(options)
         BackgroundTransparency = 1,
         Text = options.LogoFallback or "T",
         TextColor3 = Theme.Accent,
-        TextSize = interfaceTextSize(15),
+        TextSize = interfaceTextSize(20),
         FontFace = Fonts.Bold,
         Visible = logoImage == "",
         ZIndex = 202,
@@ -1528,7 +1526,7 @@ function Library:CreateWindow(options)
             BackgroundTransparency = 1,
             Text = options.LogoFallback or "T",
             TextColor3 = Theme.Accent,
-            TextSize = interfaceTextSize(15),
+            TextSize = interfaceTextSize(20),
             FontFace = Fonts.Bold,
             Visible = iconAsset == "",
         })
@@ -1544,7 +1542,7 @@ function Library:CreateWindow(options)
             TextColor3 = Theme.Text,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextTruncate = Enum.TextTruncate.AtEnd,
-            TextSize = interfaceTextSize(13),
+            TextSize = interfaceTextSize(15),
             FontFace = Fonts.Bold,
         })
 
@@ -1558,7 +1556,7 @@ function Library:CreateWindow(options)
             TextColor3 = state == true and Theme.Accent or Theme.Muted,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextTruncate = Enum.TextTruncate.AtEnd,
-            TextSize = interfaceTextSize(13),
+            TextSize = interfaceTextSize(15),
             FontFace = Fonts.Regular,
         })
         if state == true then
@@ -1980,7 +1978,7 @@ function Library:CreateWindow(options)
             BackgroundTransparency = 1,
             Text = categoryOptions.Symbol or string.sub(category.Name, 1, 1),
             TextColor3 = Theme.White,
-            TextSize = interfaceTextSize(15),
+            TextSize = interfaceTextSize(20),
             FontFace = Fonts.Bold,
             Visible = iconAsset == "",
         })
@@ -1997,7 +1995,7 @@ function Library:CreateWindow(options)
             Text = category.Name,
             TextColor3 = Theme.Text,
             TextTransparency = 1,
-            TextSize = interfaceTextSize(13),
+            TextSize = interfaceTextSize(15),
             FontFace = Fonts.Semibold,
             Visible = false,
             ZIndex = 80,
@@ -2233,7 +2231,7 @@ function Library:CreateWindow(options)
                 Text = tab.Name,
                 TextTransparency = 1,
                 TextColor3 = Theme.Muted,
-                TextSize = interfaceTextSize(14),
+                TextSize = interfaceTextSize(17),
                 FontFace = Fonts.Semibold,
                 Visible = self.Window.CurrentCategory == self,
                 LayoutOrder = tabOptions.Order or (#self.Tabs + 1),
@@ -2257,7 +2255,7 @@ function Library:CreateWindow(options)
                 BackgroundTransparency = 1,
                 Text = tab.Name,
                 TextColor3 = Theme.Muted,
-                TextSize = interfaceTextSize(14),
+                TextSize = interfaceTextSize(17),
                 FontFace = Fonts.Semibold,
                 ZIndex = 2,
             })
@@ -2565,23 +2563,22 @@ function Library:CreateWindow(options)
                 local title = create("TextLabel", {
                     Parent = cardSurface,
                     Name = "Title",
-                    Position = fromOffset(16, 11),
-                    Size = UDim2.new(1, -32, 0, 20),
+                    Position = fromOffset(20, 14),
+                    Size = UDim2.new(1, -40, 0, 26),
                     BackgroundTransparency = 1,
                     Text = sectionObject.Name,
                     TextColor3 = Theme.Text,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    TextSize = interfaceTextSize(15),
+                    TextSize = interfaceTextSize(20),
                     FontFace = Fonts.Bold,
                 })
 
-                -- Narrower per-character estimate to match the smaller type.
-                local titleWidth = min(220, max(70, 20 + #sectionObject.Name * 6))
+                local titleWidth = min(260, max(92, 34 + #sectionObject.Name * 8))
                 local titleAccentGlowOuter = create("Frame", {
                     Parent = cardSurface,
                     Name = "TitleAccentGlowOuter",
-                    Position = fromOffset(14, 32),
-                    Size = fromOffset(titleWidth + 4, 10),
+                    Position = fromOffset(18, 41),
+                    Size = fromOffset(titleWidth + 4, 14),
                     BackgroundColor3 = Theme.Accent,
                     BackgroundTransparency = 1,
                 })
@@ -2591,8 +2588,8 @@ function Library:CreateWindow(options)
                 local titleAccentGlowInner = create("Frame", {
                     Parent = cardSurface,
                     Name = "TitleAccentGlowInner",
-                    Position = fromOffset(15, 34),
-                    Size = fromOffset(titleWidth + 2, 6),
+                    Position = fromOffset(19, 44),
+                    Size = fromOffset(titleWidth + 2, 8),
                     BackgroundColor3 = Theme.Accent,
                     BackgroundTransparency = 1,
                 })
@@ -2602,11 +2599,11 @@ function Library:CreateWindow(options)
                 local titleAccent = create("Frame", {
                     Parent = cardSurface,
                     Name = "TitleAccent",
-                    Position = fromOffset(16, 36),
-                    Size = fromOffset(titleWidth, 2),
+                    Position = fromOffset(20, 46),
+                    Size = fromOffset(titleWidth, 4),
                     BackgroundColor3 = Theme.Accent,
                 })
-                corner(titleAccent, 2)
+                corner(titleAccent, 4)
                 bindTheme(titleAccent, "BackgroundColor3", function(theme) return theme.Accent end)
                 window:RegisterGlow(titleAccentGlowOuter, "BackgroundTransparency", 0.94)
                 window:RegisterGlow(titleAccentGlowInner, "BackgroundTransparency", 0.82)
@@ -2614,8 +2611,8 @@ function Library:CreateWindow(options)
                 local elements = create("Frame", {
                     Parent = cardSurface,
                     Name = "Elements",
-                    Position = fromOffset(16, 50),
-                    Size = UDim2.new(1, -32, 0, 0),
+                    Position = fromOffset(20, 64),
+                    Size = UDim2.new(1, -40, 0, 0),
                     BackgroundTransparency = 1,
                 })
                 local elementsLayout = create("UIListLayout", {
@@ -2875,7 +2872,7 @@ function SectionMethods:AddToggle(options)
         Text = text,
         TextColor3 = Theme.Muted,
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Regular,
     })
 
@@ -3167,7 +3164,7 @@ function SectionMethods:AddSlider(options)
         Text = text,
         TextColor3 = Theme.Text,
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Regular,
     })
 
@@ -3180,7 +3177,7 @@ function SectionMethods:AddSlider(options)
         Text = "",
         TextColor3 = Theme.Text,
         TextXAlignment = Enum.TextXAlignment.Right,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Regular,
     })
 
@@ -3416,7 +3413,7 @@ function SectionMethods:AddDropdown(options)
         Text = text,
         TextColor3 = Theme.Text,
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Regular,
     })
 
@@ -3441,7 +3438,7 @@ function SectionMethods:AddDropdown(options)
         TextColor3 = Theme.Text,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextTruncate = Enum.TextTruncate.AtEnd,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Regular,
         ZIndex = 3,
     })
@@ -3454,7 +3451,7 @@ function SectionMethods:AddDropdown(options)
         BackgroundTransparency = 1,
         Text = "v",
         TextColor3 = Theme.Muted,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Bold,
         ZIndex = 3,
     })
@@ -3574,7 +3571,7 @@ function SectionMethods:AddDropdown(options)
                 Text = tostring(value),
                 TextColor3 = Theme.Muted,
                 TextXAlignment = Enum.TextXAlignment.Left,
-                TextSize = interfaceTextSize(13),
+                TextSize = interfaceTextSize(15),
                 FontFace = Fonts.Regular,
                 LayoutOrder = index,
                 ZIndex = 101,
@@ -3675,7 +3672,7 @@ function SectionMethods:AddTextbox(options)
         Text = text,
         TextColor3 = Theme.Text,
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Regular,
     })
 
@@ -3706,7 +3703,7 @@ function SectionMethods:AddTextbox(options)
         TextColor3 = Theme.Text,
         TextTransparency = 0,
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Regular,
         ZIndex = 2,
     })
@@ -3810,7 +3807,7 @@ function SectionMethods:AddButton(options)
         BackgroundTransparency = 1,
         Text = text,
         TextColor3 = Theme.Text,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Regular,
         ZIndex = 2,
     })
@@ -3887,7 +3884,7 @@ function SectionMethods:AddLabel(options)
         TextYAlignment = Enum.TextYAlignment.Top,
         TextWrapped = true,
         RichText = options.RichText == true,
-        TextSize = options.TextSize or interfaceTextSize(13),
+        TextSize = options.TextSize or interfaceTextSize(15),
         FontFace = options.Bold and Fonts.Semibold or Fonts.Regular,
         LayoutOrder = options.Order or (#self.Items + 1),
     })
@@ -3964,7 +3961,7 @@ function SectionMethods:AddKeybind(options)
         Text = text,
         TextColor3 = Theme.Muted,
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Regular,
     })
 
@@ -3977,7 +3974,7 @@ function SectionMethods:AddKeybind(options)
         AutoButtonColor = false,
         Text = "",
         TextColor3 = Theme.Text,
-        TextSize = interfaceTextSize(11),
+        TextSize = interfaceTextSize(13),
         FontFace = Fonts.Semibold,
     })
     corner(bindButton, 6)
@@ -4157,7 +4154,7 @@ function SectionMethods:AddColorPicker(options)
         Text = text,
         TextColor3 = Theme.Muted,
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Regular,
     })
 
@@ -4191,7 +4188,7 @@ function SectionMethods:AddColorPicker(options)
         Text = colorToHex(Theme.Accent),
         TextColor3 = Theme.Text,
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextSize = interfaceTextSize(11),
+        TextSize = interfaceTextSize(13),
         FontFace = Fonts.Semibold,
         ZIndex = 2,
     })
@@ -4314,7 +4311,7 @@ function SectionMethods:AddColorPicker(options)
         PlaceholderColor3 = Theme.Dim,
         TextColor3 = Theme.Text,
         TextXAlignment = Enum.TextXAlignment.Center,
-        TextSize = interfaceTextSize(13),
+        TextSize = interfaceTextSize(15),
         FontFace = Fonts.Semibold,
         ZIndex = 121,
     })
