@@ -1556,7 +1556,7 @@ function Library:CreateWindow(options)
             TextColor3 = state == true and Theme.Accent or Theme.Muted,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextTruncate = Enum.TextTruncate.AtEnd,
-            TextSize = interfaceTextSize(15),
+            TextSize = interfaceTextSize(tonumber(notifyOptions.TextSize) or 15),
             FontFace = Fonts.Regular,
         })
         if state == true then
@@ -1610,6 +1610,56 @@ function Library:CreateWindow(options)
     function window:SetNotifyTitle(value)
         self.NotifyTitle = value ~= nil and tostring(value) or nil
         return self.NotifyTitle or self.Name
+    end
+
+    -- Repeating notifications, for things like a standing invite link. The
+    -- loop re-checks that the menu still exists on every wake, so Unload ends
+    -- it instead of leaving a task alive that would fire into a dead ScreenGui.
+    local repeatingNotifications = {}
+
+    function window:NotifyRepeating(repeatOptions)
+        repeatOptions = repeatOptions or {}
+
+        local interval = max(5, tonumber(repeatOptions.Interval) or 600)
+        local startDelay = tonumber(repeatOptions.StartDelay)
+        if startDelay == nil then startDelay = interval end
+
+        local handle = {Stopped = false}
+
+        function handle:Stop()
+            self.Stopped = true
+        end
+
+        insert(repeatingNotifications, handle)
+
+        task.spawn(function()
+            if startDelay > 0 then task.wait(startDelay) end
+
+            while not handle.Stopped do
+                if not screenGui.Parent then break end
+
+                window:Notify({
+                    Title = repeatOptions.Title,
+                    Text = repeatOptions.Text,
+                    Duration = repeatOptions.Duration,
+                    TextSize = repeatOptions.TextSize,
+                    Icon = repeatOptions.Icon,
+                    IconFile = repeatOptions.IconFile,
+                    State = repeatOptions.State,
+                })
+
+                task.wait(interval)
+            end
+        end)
+
+        return handle
+    end
+
+    function window:StopRepeatingNotifications()
+        for _, handle in repeatingNotifications do
+            handle.Stopped = true
+        end
+        table.clear(repeatingNotifications)
     end
 
     function window:SetToggleNotifications(state)
