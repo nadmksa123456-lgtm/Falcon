@@ -24,6 +24,7 @@ local Players = Services.Players
 local UserInputService = Services.UserInputService
 local TweenService = Services.TweenService
 local Workspace = Services.Workspace
+local Lighting = Services.Lighting
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -601,6 +602,9 @@ function Library:Unload()
         if window.ScreenGui and window.ScreenGui.Parent then
             window.ScreenGui:Destroy()
         end
+        if window.BackdropBlur and window.BackdropBlur.Parent then
+            window.BackdropBlur:Destroy()
+        end
     end
 
     for _, connection in self.Connections do
@@ -729,6 +733,34 @@ function Library:CreateWindow(options)
     -- MainWindow and its depth layers are centre-anchored. UIScale pivots on
     -- the anchor point, so a centred anchor lets the open/close scale run
     -- without touching Position at all.
+    -- Backdrop blur. Roblox cannot blur only the area behind a frame, so this
+    -- softens the whole 3D scene while the menu is open. Interface elements are
+    -- drawn after post-processing and stay sharp.
+    local BLUR_SIZE = clamp(tonumber(options.BlurSize) or 16, 0, 56)
+    local backdropBlur
+
+    if options.Blur ~= false then
+        local ok, effect = pcall(function()
+            return create("BlurEffect", {
+                Parent = Lighting,
+                Name = "TRustMenuBlur",
+                Size = 0,
+            })
+        end)
+        if ok then backdropBlur = effect end
+    end
+
+    local function applyBlur(state, animate)
+        if not backdropBlur or not backdropBlur.Parent then return end
+
+        local target = state and BLUR_SIZE or 0
+        if animate then
+            tween(backdropBlur, {Size = target}, 0.26, Enum.EasingStyle.Quart)
+        else
+            setProperties(backdropBlur, {Size = target})
+        end
+    end
+
     local initialX = floor(viewport.X / 2)
     local initialY = floor(viewport.Y / 2)
 
@@ -783,7 +815,11 @@ function Library:CreateWindow(options)
     })
     corner(main, 14)
     stroke(main, Theme.Border, 0.05, 1)
-    setProperties(main, {BackgroundTransparency = 1})
+    setProperties(main, {
+        BackgroundColor3 = Theme.Window,
+        BackgroundTransparency = SURFACE_TRANSPARENCY,
+    })
+    bindTheme(main, "BackgroundColor3", function(theme) return theme.Window end)
 
     -- Drives the open/close scale. Kept separate from Size so FitToViewport
     -- and the drag handler keep owning the real geometry.
@@ -813,7 +849,6 @@ function Library:CreateWindow(options)
         BackgroundTransparency = 0,
         ClipsDescendants = false,
     })
-    corner(sidebar, 14)
 
     local sidebarDivider = create("Frame", {
         Parent = sidebar,
@@ -935,9 +970,8 @@ function Library:CreateWindow(options)
         Position = fromOffset(sidebarWidth, 0),
         Size = UDim2.new(1, -sidebarWidth, 0, topbarHeight),
         BackgroundColor3 = Theme.Topbar,
-        BackgroundTransparency = SURFACE_TRANSPARENCY,
+        BackgroundTransparency = 1,
     })
-    corner(topbar, 14)
 
     local topbarDivider = create("Frame", {
         Parent = topbar,
@@ -1036,8 +1070,7 @@ function Library:CreateWindow(options)
         BackgroundColor3 = Theme.Content,
         ClipsDescendants = true,
     })
-    corner(content, 14)
-    setProperties(content, {BackgroundTransparency = SURFACE_TRANSPARENCY})
+    setProperties(content, {BackgroundTransparency = 1})
 
     local popupLayer = create("CanvasGroup", {
         Parent = screenGui,
@@ -1172,6 +1205,7 @@ function Library:CreateWindow(options)
         Visible = true,
         Opacity = 1,
         WindowScale = windowScale,
+        BackdropBlur = backdropBlur,
         NotifyHolder = notifyHolder,
         NotifyToggles = options.NotifyToggles ~= false,
         NotifyTitle = options.NotifyTitle or options.NotificationTitle,
@@ -1676,6 +1710,7 @@ function Library:CreateWindow(options)
         self.Visible = state
         visibilityToken += 1
         local token = visibilityToken
+        applyBlur(state, animate)
         self:RefreshLauncher(animate)
 
         local targetScale = state and 1 or VISIBILITY_SHRINK
@@ -1735,6 +1770,22 @@ function Library:CreateWindow(options)
 
     function window:GetToggleKey()
         return self.ToggleKey
+    end
+
+    function window:SetBlurEnabled(state)
+        if not backdropBlur or not backdropBlur.Parent then return false end
+        applyBlur(state ~= false and self.Visible, true)
+        return state ~= false
+    end
+
+    function window:SetBlurSize(value)
+        BLUR_SIZE = clamp(tonumber(value) or BLUR_SIZE, 0, 56)
+        applyBlur(self.Visible, true)
+        return BLUR_SIZE
+    end
+
+    function window:GetBlurSize()
+        return BLUR_SIZE
     end
 
     function window:SetLauncherVisible(state)
@@ -1820,6 +1871,10 @@ function Library:CreateWindow(options)
     end)
 
     window:RefreshLauncher(false)
+
+    -- The menu starts open, so the blur has to match that state on load rather
+    -- than waiting for the first toggle.
+    applyBlur(true, false)
 
     function window:SetThemeColor(color, animate)
         return Library:SetThemeColor(color, animate)
