@@ -122,14 +122,17 @@ Controls.MenuBlur = Sections.MenuSettings:AddToggle({
 })
 
 Controls.BlurIntensity = Sections.MenuSettings:AddSlider({
-	Text = "Blur Intensity",
-	Flag = "menu_blur_size",
+	Text = "Blur Amount",
+	Flag = "menu_blur_amount",
 	Order = 6,
 	Min = 0,
-	Max = 30,
-	Default = 10,
+	Max = 100,
+	Default = 70,
+	Suffix = "%",
+	-- Glass density runs 0.90 (heaviest) to 0.995 (barely there), so the slider
+	-- is inverted: a higher percentage means a stronger blur.
 	Callback = function(value)
-		Window:SetBlurSize(value)
+		Window:SetBlurStrength(0.995 - (value / 100) * 0.095)
 	end,
 })
 
