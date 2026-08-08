@@ -110,17 +110,6 @@ Controls.MenuKey = Sections.MenuSettings:AddKeybind({
 	end,
 })
 
-Controls.MenuBlur = Sections.MenuSettings:AddToggle({
-	Text = "Background Blur",
-	Flag = "menu_blur",
-	Order = 5,
-	Default = true,
-	Notify = false,
-	Callback = function(state)
-		Window:SetBlurEnabled(state)
-	end,
-})
-
 Controls.MenuButton = Sections.MenuSettings:AddToggle({
 	Text = "Menu Button",
 	Flag = "menu_button",
@@ -138,7 +127,6 @@ local function refreshMenuSettings()
 	Controls.MenuOpacity.Row.Visible = true
 	Controls.MenuKey.Row.Visible = true
 	Controls.MenuButton.Row.Visible = true
-	Controls.MenuBlur.Row.Visible = true
 	Sections.MenuSettings:Refresh()
 	Tabs.Settings:RefreshCanvas()
 end
