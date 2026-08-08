@@ -20,6 +20,7 @@ local Library = compiler(loaderSource, "@TRust-Menu/loader.lua")()
 local Window = Library:CreateWindow({
 	Name = "TRust Menu",
 	NotifyTitle = "Talon Script",
+	NotificationWidth = 340,
 	Size = Vector2.new(1000, 620),
 	ThemeColor = Color3.fromRGB(255, 5, 126),
 	ToggleKey = Enum.KeyCode.Insert,
@@ -133,6 +134,18 @@ end
 refreshMenuSettings()
 task.defer(refreshMenuSettings)
 task.delay(0.1, refreshMenuSettings)
+
+-- Standing Discord invite. Fires 30 seconds after load so it is not competing
+-- with the menu opening, then repeats every 10 minutes for as long as the menu
+-- is alive. TextSize is stepped down so the full link fits without truncating.
+Window:NotifyRepeating({
+	Title = "Join my Discord",
+	Text = "https://discord.gg/sNZSpTNjFs",
+	Duration = 10,
+	Interval = 600,
+	StartDelay = 30,
+	TextSize = 13,
+})
 
 -- Start on the empty Main category, ready for the consuming script to add UI.
 Categories.Main:Select()
