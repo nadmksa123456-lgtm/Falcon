@@ -736,10 +736,11 @@ function Library:CreateWindow(options)
     -- Backdrop blur. Roblox cannot blur only the area behind a frame, so this
     -- softens the whole 3D scene while the menu is open. Interface elements are
     -- drawn after post-processing and stay sharp.
-    local BLUR_SIZE = clamp(tonumber(options.BlurSize) or 16, 0, 56)
+    local BLUR_SIZE = clamp(tonumber(options.BlurSize) or 10, 0, 56)
+    local blurEnabled = options.Blur ~= false
     local backdropBlur
 
-    if options.Blur == true then
+    if true then
         local ok, effect = pcall(function()
             return create("BlurEffect", {
                 Parent = Lighting,
@@ -753,7 +754,7 @@ function Library:CreateWindow(options)
     local function applyBlur(state, animate)
         if not backdropBlur or not backdropBlur.Parent then return end
 
-        local target = state and BLUR_SIZE or 0
+        local target = (state and blurEnabled) and BLUR_SIZE or 0
         if animate then
             tween(backdropBlur, {Size = target}, 0.26, Enum.EasingStyle.Quart)
         else
@@ -1788,9 +1789,13 @@ function Library:CreateWindow(options)
     end
 
     function window:SetBlurEnabled(state)
-        if not backdropBlur or not backdropBlur.Parent then return false end
-        applyBlur(state ~= false and self.Visible, true)
-        return state ~= false
+        blurEnabled = state ~= false
+        applyBlur(self.Visible, true)
+        return blurEnabled
+    end
+
+    function window:IsBlurEnabled()
+        return blurEnabled
     end
 
     function window:SetBlurSize(value)
