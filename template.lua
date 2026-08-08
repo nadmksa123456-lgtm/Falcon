@@ -114,11 +114,22 @@ Controls.MenuBlur = Sections.MenuSettings:AddToggle({
 	Text = "Background Blur",
 	Flag = "menu_blur",
 	Order = 5,
-	-- Off by default: Roblox blur is full-screen, not just behind the menu.
-	Default = false,
+	Default = true,
 	Notify = false,
 	Callback = function(state)
 		Window:SetBlurEnabled(state)
+	end,
+})
+
+Controls.BlurIntensity = Sections.MenuSettings:AddSlider({
+	Text = "Blur Intensity",
+	Flag = "menu_blur_size",
+	Order = 6,
+	Min = 0,
+	Max = 30,
+	Default = 10,
+	Callback = function(value)
+		Window:SetBlurSize(value)
 	end,
 })
 
@@ -140,6 +151,7 @@ local function refreshMenuSettings()
 	Controls.MenuKey.Row.Visible = true
 	Controls.MenuButton.Row.Visible = true
 	Controls.MenuBlur.Row.Visible = true
+	Controls.BlurIntensity.Row.Visible = true
 	Sections.MenuSettings:Refresh()
 	Tabs.Settings:RefreshCanvas()
 end
