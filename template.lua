@@ -121,21 +121,6 @@ Controls.MenuBlur = Sections.MenuSettings:AddToggle({
 	end,
 })
 
-Controls.BlurIntensity = Sections.MenuSettings:AddSlider({
-	Text = "Blur Amount",
-	Flag = "menu_blur_amount",
-	Order = 6,
-	Min = 0,
-	Max = 100,
-	Default = 70,
-	Suffix = "%",
-	-- Glass density runs 0.90 (heaviest) to 0.995 (barely there), so the slider
-	-- is inverted: a higher percentage means a stronger blur.
-	Callback = function(value)
-		Window:SetBlurStrength(0.995 - (value / 100) * 0.095)
-	end,
-})
-
 Controls.MenuButton = Sections.MenuSettings:AddToggle({
 	Text = "Menu Button",
 	Flag = "menu_button",
@@ -154,7 +139,6 @@ local function refreshMenuSettings()
 	Controls.MenuKey.Row.Visible = true
 	Controls.MenuButton.Row.Visible = true
 	Controls.MenuBlur.Row.Visible = true
-	Controls.BlurIntensity.Row.Visible = true
 	Sections.MenuSettings:Refresh()
 	Tabs.Settings:RefreshCanvas()
 end
