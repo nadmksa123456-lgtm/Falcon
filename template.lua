@@ -114,7 +114,8 @@ Controls.MenuBlur = Sections.MenuSettings:AddToggle({
 	Text = "Background Blur",
 	Flag = "menu_blur",
 	Order = 5,
-	Default = true,
+	-- Off by default: Roblox blur is full-screen, not just behind the menu.
+	Default = false,
 	Notify = false,
 	Callback = function(state)
 		Window:SetBlurEnabled(state)
