@@ -24,7 +24,7 @@ local Players = Services.Players
 local UserInputService = Services.UserInputService
 local TweenService = Services.TweenService
 local Workspace = Services.Workspace
-local RunService = Services.RunService
+local Lighting = Services.Lighting
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -124,7 +124,7 @@ local Fonts = {
 -- durations so the same kind of interaction always feels the same.
 -- How much of the game shows through the menu body and the top bar. The
 -- sidebar stays fully opaque, which is what makes the depth read.
-local SURFACE_TRANSPARENCY = 0.34
+local SURFACE_TRANSPARENCY = 0.12
 
 local Motion = {
     Press  = 0.09, -- tap / hold feedback
@@ -602,7 +602,9 @@ function Library:Unload()
         if window.ScreenGui and window.ScreenGui.Parent then
             window.ScreenGui:Destroy()
         end
-        if window.DestroyAcrylic then window.DestroyAcrylic() end
+        if window.BackdropBlur and window.BackdropBlur.Parent then
+            window.BackdropBlur:Destroy()
+        end
     end
 
     for _, connection in self.Connections do
@@ -734,99 +736,28 @@ function Library:CreateWindow(options)
     -- Backdrop blur. Roblox cannot blur only the area behind a frame, so this
     -- softens the whole 3D scene while the menu is open. Interface elements are
     -- drawn after post-processing and stay sharp.
-    -- Backdrop blur scoped to the menu. Roblox has no backdrop-filter, and
-    -- BlurEffect is a full-screen post-process, so neither can blur one region.
-    -- What can: a thin Glass part parked in front of the camera and scaled to
-    -- the menu's screen rectangle. Glass refraction blurs the scene behind that
-    -- rectangle and leaves the rest of the view untouched.
-    local ACRYLIC_DISTANCE = 2
-    local ACRYLIC_DENSITY = clamp(tonumber(options.BlurStrength) or 0.97, 0.9, 0.995)
-    local acrylicEnabled = options.Blur ~= false
-    local acrylicPart
-    local acrylicConnection
+    local BLUR_SIZE = clamp(tonumber(options.BlurSize) or 16, 0, 56)
+    local backdropBlur
 
-    local function destroyAcrylic()
-        if acrylicConnection then
-            disconnectTracked(acrylicConnection)
-            acrylicConnection = nil
-        end
-        if acrylicPart then
-            acrylicPart:Destroy()
-            acrylicPart = nil
-        end
-    end
-
-    local function updateAcrylic()
-        if not acrylicPart or not acrylicPart.Parent then return end
-
-        local activeCam = Workspace.CurrentCamera
-        if not activeCam or not main.Parent or not main.Visible or not acrylicEnabled then
-            acrylicPart.Transparency = 1
-            return
-        end
-
-        local view = activeCam.ViewportSize
-        if view.X <= 0 or view.Y <= 0 then return end
-
-        -- Work out how many studs one screen height covers at this distance,
-        -- then map the menu's pixel rectangle onto that plane.
-        local worldHeight = 2 * ACRYLIC_DISTANCE * math.tan(math.rad(activeCam.FieldOfView) / 2)
-        local worldWidth = worldHeight * (view.X / view.Y)
-
-        local absPosition = main.AbsolutePosition
-        local absSize = main.AbsoluteSize
-        local centerX = absPosition.X + absSize.X / 2
-        local centerY = absPosition.Y + absSize.Y / 2
-
-        acrylicPart.Size = Vector3.new(
-            (absSize.X / view.X) * worldWidth,
-            (absSize.Y / view.Y) * worldHeight,
-            0.05
-        )
-        acrylicPart.CFrame = activeCam.CFrame * CFrame.new(
-            ((centerX / view.X) * 2 - 1) * (worldWidth / 2),
-            (1 - (centerY / view.Y) * 2) * (worldHeight / 2),
-            -ACRYLIC_DISTANCE
-        )
-        acrylicPart.Transparency = ACRYLIC_DENSITY
-    end
-
-    local function ensureAcrylic()
-        if acrylicPart and acrylicPart.Parent then return end
-
-        local ok, part = pcall(function()
-            local created = Instance.new("Part")
-            created.Name = "TRustMenuAcrylic"
-            created.Anchored = true
-            created.CanCollide = false
-            created.CanQuery = false
-            created.CanTouch = false
-            created.CastShadow = false
-            created.Locked = true
-            created.Material = Enum.Material.Glass
-            created.Color = Theme.Window
-            created.Transparency = ACRYLIC_DENSITY
-            created.Size = Vector3.new(1, 1, 0.05)
-            -- Parented to the camera so it never replicates and never shows up
-            -- in the workspace for anything else to trip over.
-            created.Parent = Workspace.CurrentCamera
-            return created
+    if options.Blur ~= false then
+        local ok, effect = pcall(function()
+            return create("BlurEffect", {
+                Parent = Lighting,
+                Name = "TRustMenuBlur",
+                Size = 0,
+            })
         end)
-
-        if not ok then return end
-        acrylicPart = part
-
-        if not acrylicConnection then
-            acrylicConnection = connect(RunService.RenderStepped, updateAcrylic)
-        end
+        if ok then backdropBlur = effect end
     end
 
-    local function applyAcrylic(state)
-        if state and acrylicEnabled then
-            ensureAcrylic()
-            updateAcrylic()
+    local function applyBlur(state, animate)
+        if not backdropBlur or not backdropBlur.Parent then return end
+
+        local target = state and BLUR_SIZE or 0
+        if animate then
+            tween(backdropBlur, {Size = target}, 0.26, Enum.EasingStyle.Quart)
         else
-            destroyAcrylic()
+            setProperties(backdropBlur, {Size = target})
         end
     end
 
@@ -918,21 +849,6 @@ function Library:CreateWindow(options)
         BackgroundTransparency = 0,
         ClipsDescendants = false,
     })
-    corner(sidebar, 14)
-
-    -- UICorner rounds all four corners, which would leave notches down the
-    -- sidebar's inner edge. This square filler starts past the radius so the
-    -- outer corners stay round while the edge meeting the content stays flush.
-    local sidebarFill = create("Frame", {
-        Parent = sidebar,
-        Name = "SidebarFill",
-        Position = fromOffset(14, 0),
-        Size = UDim2.new(1, -14, 1, 0),
-        BackgroundColor3 = Theme.Sidebar,
-        BackgroundTransparency = 0,
-        ZIndex = 0,
-    })
-    bindTheme(sidebarFill, "BackgroundColor3", function(theme) return theme.Sidebar end)
 
     local sidebarDivider = create("Frame", {
         Parent = sidebar,
@@ -1289,6 +1205,7 @@ function Library:CreateWindow(options)
         Visible = true,
         Opacity = 1,
         WindowScale = windowScale,
+        BackdropBlur = backdropBlur,
         NotifyHolder = notifyHolder,
         NotifyToggles = options.NotifyToggles ~= false,
         NotifyTitle = options.NotifyTitle or options.NotificationTitle,
@@ -1793,7 +1710,7 @@ function Library:CreateWindow(options)
         self.Visible = state
         visibilityToken += 1
         local token = visibilityToken
-        applyAcrylic(state)
+        applyBlur(state, animate)
         self:RefreshLauncher(animate)
 
         local targetScale = state and 1 or VISIBILITY_SHRINK
@@ -1856,29 +1773,19 @@ function Library:CreateWindow(options)
     end
 
     function window:SetBlurEnabled(state)
-        acrylicEnabled = state ~= false
-        applyAcrylic(self.Visible)
-        return acrylicEnabled
+        if not backdropBlur or not backdropBlur.Parent then return false end
+        applyBlur(state ~= false and self.Visible, true)
+        return state ~= false
     end
 
-    function window:IsBlurEnabled()
-        return acrylicEnabled
+    function window:SetBlurSize(value)
+        BLUR_SIZE = clamp(tonumber(value) or BLUR_SIZE, 0, 56)
+        applyBlur(self.Visible, true)
+        return BLUR_SIZE
     end
 
-    function window:SetBlurStrength(value)
-        ACRYLIC_DENSITY = clamp(tonumber(value) or ACRYLIC_DENSITY, 0.9, 0.995)
-        updateAcrylic()
-        return ACRYLIC_DENSITY
-    end
-
-    function window:GetBlurStrength()
-        return ACRYLIC_DENSITY
-    end
-
-    function window:SetSurfaceTransparency(value)
-        local amount = clamp(tonumber(value) or SURFACE_TRANSPARENCY, 0, 0.9)
-        setProperties(self.Main, {BackgroundTransparency = amount})
-        return amount
+    function window:GetBlurSize()
+        return BLUR_SIZE
     end
 
     function window:SetLauncherVisible(state)
@@ -1963,12 +1870,11 @@ function Library:CreateWindow(options)
         end
     end)
 
-    window.DestroyAcrylic = destroyAcrylic
     window:RefreshLauncher(false)
 
     -- The menu starts open, so the blur has to match that state on load rather
     -- than waiting for the first toggle.
-    applyAcrylic(true)
+    applyBlur(true, false)
 
     function window:SetThemeColor(color, animate)
         return Library:SetThemeColor(color, animate)
