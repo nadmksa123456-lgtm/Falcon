@@ -739,7 +739,7 @@ function Library:CreateWindow(options)
     local BLUR_SIZE = clamp(tonumber(options.BlurSize) or 16, 0, 56)
     local backdropBlur
 
-    if options.Blur ~= false then
+    if options.Blur == true then
         local ok, effect = pcall(function()
             return create("BlurEffect", {
                 Parent = Lighting,
@@ -849,6 +849,21 @@ function Library:CreateWindow(options)
         BackgroundTransparency = 0,
         ClipsDescendants = false,
     })
+    corner(sidebar, 14)
+
+    -- UICorner rounds all four corners, which would leave notches down the
+    -- sidebar's inner edge. This square filler starts past the radius so the
+    -- outer corners stay round while the edge meeting the content stays flush.
+    local sidebarFill = create("Frame", {
+        Parent = sidebar,
+        Name = "SidebarFill",
+        Position = fromOffset(14, 0),
+        Size = UDim2.new(1, -14, 1, 0),
+        BackgroundColor3 = Theme.Sidebar,
+        BackgroundTransparency = 0,
+        ZIndex = 0,
+    })
+    bindTheme(sidebarFill, "BackgroundColor3", function(theme) return theme.Sidebar end)
 
     local sidebarDivider = create("Frame", {
         Parent = sidebar,
