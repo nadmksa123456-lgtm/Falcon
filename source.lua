@@ -68,7 +68,7 @@ local Theme = {
     ControlHover = rgb(44, 37, 51),
     Track = rgb(44, 37, 51),
     Border = rgb(44, 37, 51),
-    Divider = rgb(77, 27, 52),       -- #4D1B34 Sidebar / topbar separators
+    Divider = rgb(34, 38, 41),       -- #222629 Sidebar / topbar separators
     Text = rgb(255, 255, 255),
     Muted = rgb(179, 179, 184),      -- #B3B3B8 Text Secondary
     Dim = rgb(179, 179, 184),
@@ -121,6 +121,10 @@ local Fonts = {
 
 -- Motion tokens. Every control animation resolves to one of these three
 -- durations so the same kind of interaction always feels the same.
+-- How much of the game shows through the menu body and the top bar. The
+-- sidebar stays fully opaque, which is what makes the depth read.
+local SURFACE_TRANSPARENCY = 0.12
+
 local Motion = {
     Press  = 0.09, -- tap / hold feedback
     State  = 0.16, -- colour, hover, on-off
@@ -428,16 +432,9 @@ local function deriveSurfaceTheme()
     Theme.ControlHover = rgb(44, 37, 51)
     Theme.Track = rgb(44, 37, 51)
     Theme.Border = rgb(44, 37, 51)
-    if colorsClose(Theme.Accent, rgb(255, 5, 126)) then
-        Theme.Divider = rgb(77, 27, 52)
-    else
-        local hue, saturation, value = Theme.Accent:ToHSV()
-        Theme.Divider = Color3.fromHSV(
-            hue,
-            clamp(saturation * 0.67, 0, 1),
-            clamp(value * 0.353, 0.12, 0.42)
-        )
-    end
+    -- Deliberately not derived from the accent: the separator reads as part of
+    -- the frame, not as decoration, so it holds one value across every theme.
+    Theme.Divider = rgb(34, 38, 41)
     Theme.Muted = rgb(179, 179, 184)
     Theme.Dim = rgb(179, 179, 184)
 end
@@ -786,7 +783,7 @@ function Library:CreateWindow(options)
     })
     corner(main, 14)
     stroke(main, Theme.Border, 0.05, 1)
-    gradient(main, Theme.Window, Theme.Content, 90)
+    setProperties(main, {BackgroundTransparency = 1})
 
     -- Drives the open/close scale. Kept separate from Size so FitToViewport
     -- and the drag handler keep owning the real geometry.
@@ -813,6 +810,7 @@ function Library:CreateWindow(options)
         Name = "Sidebar",
         Size = UDim2.new(0, sidebarWidth, 1, 0),
         BackgroundColor3 = Theme.Sidebar,
+        BackgroundTransparency = 0,
         ClipsDescendants = false,
     })
     corner(sidebar, 14)
@@ -937,6 +935,7 @@ function Library:CreateWindow(options)
         Position = fromOffset(sidebarWidth, 0),
         Size = UDim2.new(1, -sidebarWidth, 0, topbarHeight),
         BackgroundColor3 = Theme.Topbar,
+        BackgroundTransparency = SURFACE_TRANSPARENCY,
     })
     corner(topbar, 14)
 
@@ -1038,7 +1037,7 @@ function Library:CreateWindow(options)
         ClipsDescendants = true,
     })
     corner(content, 14)
-    gradient(content, Theme.Content, Theme.Window, 90)
+    setProperties(content, {BackgroundTransparency = SURFACE_TRANSPARENCY})
 
     local popupLayer = create("CanvasGroup", {
         Parent = screenGui,
@@ -2574,41 +2573,10 @@ function Library:CreateWindow(options)
                     ClipsDescendants = true,
                 })
                 corner(cardSurface, 12)
-                local cardStroke = stroke(cardSurface, Theme.Accent, 0.68, 1)
+                local cardStroke = stroke(cardSurface, Theme.Divider, 0.35, 1)
                 bindTheme(cardStroke, "Color", function(theme)
-                    return theme.Accent
+                    return theme.Divider
                 end)
-                gradient(cardSurface, Theme.Card, Theme.CardBottom, 90)
-
-                local cardHighlight = create("Frame", {
-                    Parent = cardSurface,
-                    Name = "TopLeftHighlight",
-                    Size = UDim2.fromScale(1, 1),
-                    BackgroundColor3 = Theme.White,
-                })
-                corner(cardHighlight, 12)
-                local cardHighlightGradient = create("UIGradient", {
-                    Parent = cardHighlight,
-                    Rotation = 32,
-                    Color = ColorSequence.new({
-                        ColorSequenceKeypoint.new(0, Theme.AccentLight),
-                        ColorSequenceKeypoint.new(0.46, Theme.Card),
-                        ColorSequenceKeypoint.new(1, Theme.CardBottom),
-                    }),
-                    Transparency = NumberSequence.new({
-                        NumberSequenceKeypoint.new(0, 0.86),
-                        NumberSequenceKeypoint.new(0.38, 0.955),
-                        NumberSequenceKeypoint.new(0.72, 0.99),
-                        NumberSequenceKeypoint.new(1, 1),
-                    }),
-                })
-                bindTheme(cardHighlightGradient, "Color", function(theme)
-                    return ColorSequence.new({
-                        ColorSequenceKeypoint.new(0, theme.AccentLight),
-                        ColorSequenceKeypoint.new(0.46, theme.Card),
-                        ColorSequenceKeypoint.new(1, theme.CardBottom),
-                    })
-                end, true)
 
                 local title = create("TextLabel", {
                     Parent = cardSurface,
